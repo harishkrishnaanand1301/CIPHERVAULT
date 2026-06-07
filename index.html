@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CipherVault — Text Encryption App</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 148'><path d='M60 0 L108 22 L108 72 Q108 120 60 148 Q12 120 12 72 L12 22 Z' fill='%231D9E75'/><path d='M60 10 L100 29 L100 72 Q100 112 60 136 Q20 112 20 72 L20 29 Z' fill='%230F6E56'/><rect x='40' y='60' width='40' height='32' rx='5' fill='%23E6FAF4'/><path d='M48 60 L48 48 Q48 36 60 36 Q72 36 72 48 L72 60' fill='none' stroke='%23E6FAF4' stroke-width='5' stroke-linecap='round'/><circle cx='60' cy='74' r='6' fill='%230F6E56'/><rect x='57.5' y='74' width='5' height='9' rx='1.5' fill='%230F6E56'/></svg>">
+
+  <!-- CryptoJS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+  <!-- Tabler Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600&display=swap" rel="stylesheet" />
+  <!-- Firebase v9 (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --bg2:       #161b22;
+      --bg3:       #1c2128;
+      --border:    rgba(255,255,255,0.08);
+      --border2:   rgba(255,255,255,0.15);
+      --text:      #e6edf3;
+      --muted:     #7d8590;
+      --accent:    #1D9E75;
+      --accent2:   #0F6E56;
+      --info:      #378ADD;
+      --danger:    #E24B4A;
+      --warn:      #EF9F27;
+      --rad:       8px;
+      --radlg:     12px;
+      --font-mono: 'Share Tech Mono', 'Courier New', monospace;
+      --font-ui:   'Rajdhani', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      min-height: 100vh;
+    }
+
+    /* ─────────────────────────────────────────
+       AUTH SCREEN
+    ───────────────────────────────────────── */
+    #authScreen {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: radial-gradient(ellipse at 20% 50%, rgba(29,158,117,0.06) 0%, transparent 60%),
+                  radial-gradient(ellipse at 80% 20%, rgba(55,138,221,0.04) 0%, transparent 50%),
+                  var(--bg);
+    }
+    .auth-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--bg2);
+      border: 0.5px solid var(--border2);
+      border-radius: var(--radlg);
+      padding: 2.5rem 2rem;
+    }
+    .auth-logo {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 2rem;
+    }
+    .auth-logo svg { width: 52px; height: 52px; flex-shrink: 0; }
+    .auth-logo .title { font-size: 24px; font-weight: 600; font-family: var(--font-ui); letter-spacing: 0.08em; }
+    .auth-logo .subtitle { font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
+
+    .auth-tabs {
+      display: flex;
+      border-bottom: 0.5px solid var(--border);
+      margin-bottom: 1.75rem;
+    }
+    .auth-tab {
+      flex: 1;
+      padding: 10px;
+      background: none;
+      border: none;
+      font-family: var(--font-ui);
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      letter-spacing: 0.06em;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -0.5px;
+      transition: all 0.15s;
+    }
+    .auth-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .auth-field { margin-bottom: 1rem; }
+    .auth-field label { display: block; font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; font-family: var(--font-ui); }
+    .auth-input {
+      width: 100%;
+      background: var(--bg3);
+      border: 0.5px solid var(--border);
+      border-radius: var(--rad);
+      padding: 10px 14px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .auth-input:focus { border-color: var(--accent); }
+    .auth-input::placeholder { color: var(--muted); }
+
+    /* Password strength bar */
+    .pw-strength { margin-top: 6px; }
+    .pw-bar-wrap { height: 3px; background: var(--bg3); border-radius: 99px; margin-bottom: 4px; }
+    .pw-bar { height: 3px; border-radius: 99px; width: 0%; transition: width 0.3s, background 0.3s; }
+    .pw-label { font-size: 10px; color: var(--muted); letter-spacing: 0.05em; }
+
+    .auth-submit {
+      width: 100%;
+      padding: 11px;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--rad);
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      letter-spacing: 0.06em;
+      transition: background 0.15s;
+      margin-top: 0.5rem;
+    }
+    .auth-submit:hover { background: var(--accent2); }
+    .auth-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .auth-error {
+      margin-top: 1rem;
+      padding: 8px 12px;
+      background: rgba(226,75,74,0.1);
+      border: 0.5px solid rgba(226,75,74,0.3);
+      border-radius: var(--rad);
+      font-size: 12px;
+      color: var(--danger);
+      display: none;
+    }
+    .auth-error.show { display: block; }
+
+    .pw-rules { margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.7; display: none; }
+    .pw-rules.show { display: block; }
+    .pw-rule { display: flex; align-items: center; gap: 6px; }
+    .pw-rule .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); flex-shrink: 0; transition: background 0.2s; }
+    .pw-rule.pass .dot { background: var(--accent); }
+    .pw-rule.pass { color: var(--accent); }
+
+    /* ─────────────────────────────────────────
+       MAIN APP SCREEN
+    ───────────────────────────────────────── */
+    #appScreen { display: none; }
+
+    .app-wrap {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+      padding-bottom: 1.25rem;
+      border-bottom: 0.5px solid var(--border);
+      gap: 12px;
+    }
+    .header-left { display: flex; align-items: center; gap: 16px; }
+    .logo-svg { width: 52px; height: 52px; flex-shrink: 0; }
+    .title { font-size: 24px; font-weight: 600; font-family: var(--font-ui); letter-spacing: 0.08em; }
+    .subtitle { font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
+    .header-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .user-badge {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--bg2); border: 0.5px solid var(--border);
+      border-radius: var(--rad); padding: 6px 12px;
+      font-size: 12px; color: var(--muted);
+    }
+    .user-badge i { color: var(--accent); }
+    .logout-btn {
+      background: transparent; border: 0.5px solid var(--border);
+      border-radius: var(--rad); padding: 6px 12px;
+      font-size: 12px; color: var(--muted);
+      cursor: pointer; font-family: var(--font-mono);
+      transition: all 0.15s; display: flex; align-items: center; gap: 6px;
+    }
+    .logout-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+    /* Two-column layout */
+    .app-cols {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 20px;
+    }
+    @media (max-width: 780px) { .app-cols { grid-template-columns: 1fr; } }
+
+    /* ── Section Labels ── */
+    .section-label {
+      font-size: 10px; color: var(--muted);
+      letter-spacing: 0.12em; text-transform: uppercase;
+      margin-bottom: 8px; font-family: var(--font-ui);
+    }
+
+    /* ── Algorithm Grid ── */
+    .algo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+      gap: 7px; margin-bottom: 1.25rem;
+    }
+    .algo-btn {
+      background: var(--bg2); border: 0.5px solid var(--border);
+      border-radius: var(--rad); padding: 9px 6px;
+      cursor: pointer; text-align: center;
+      transition: all 0.15s; color: var(--text);
+    }
+    .algo-btn:hover { border-color: var(--accent); background: var(--bg3); }
+    .algo-btn.active { border-color: var(--accent); background: rgba(29,158,117,0.12); }
+    .algo-btn .algo-name { font-size: 13px; font-weight: 600; font-family: var(--font-mono); }
+    .algo-btn .algo-type { font-size: 10px; color: var(--muted); margin-top: 3px; font-family: var(--font-ui); }
+    .algo-btn.active .algo-name { color: var(--accent); }
+
+    /* ── Key Row ── */
+    .key-row { display: flex; gap: 8px; margin-bottom: 1rem; align-items: flex-end; }
+    .key-wrap { flex: 1; }
+    .key-input {
+      width: 100%; font-family: var(--font-mono); font-size: 13px;
+      background: var(--bg2); border: 0.5px solid var(--border);
+      border-radius: var(--rad); padding: 9px 12px;
+      color: var(--text); outline: none; transition: border-color 0.15s;
+    }
+    .key-input:focus { border-color: var(--accent); }
+    .key-input:disabled { opacity: 0.35; cursor: not-allowed; }
+    .key-input::placeholder { color: var(--muted); }
+    .gen-btn {
+      background: transparent; border: 0.5px solid var(--border2);
+      border-radius: var(--rad); padding: 9px 14px;
+      font-size: 12px; color: var(--muted); cursor: pointer;
+      font-family: var(--font-mono); white-space: nowrap; transition: all 0.15s;
+    }
+    .gen-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── IO Grid ── */
+    .io-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 1rem; }
+    @media (max-width: 500px) { .io-grid { grid-template-columns: 1fr; } }
+    .io-box { display: flex; flex-direction: column; }
+    .io-textarea {
+      flex: 1; min-height: 130px; width: 100%;
+      font-family: var(--font-mono); font-size: 12px;
+      background: var(--bg2); border: 0.5px solid var(--border);
+      border-radius: var(--rad); padding: 10px;
+      color: var(--text); outline: none; resize: vertical;
+      line-height: 1.6; transition: border-color 0.15s;
+    }
+    .io-textarea:focus { border-color: var(--accent); }
+    .io-textarea::placeholder { color: var(--muted); }
+    .io-textarea.output { color: var(--accent); background: rgba(29,158,117,0.04); }
+
+    /* ── Action Bar ── */
+    .action-bar { display: flex; gap: 7px; margin-bottom: 1rem; flex-wrap: wrap; }
+    .action-btn {
+      flex: 1; min-width: 80px; padding: 9px 12px;
+      border-radius: var(--rad); font-size: 12px;
+      font-family: var(--font-mono); cursor: pointer;
+      transition: all 0.12s; letter-spacing: 0.04em;
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+    }
+    .btn-encrypt { background: var(--accent); color: #fff; border: none; }
+    .btn-encrypt:hover { background: var(--accent2); }
+    .btn-decrypt { background: transparent; border: 0.5px solid var(--border2); color: var(--text); }
+    .btn-decrypt:hover { border-color: var(--info); color: var(--info); }
+    .btn-copy { background: transparent; border: 0.5px solid var(--border); color: var(--muted); }
+    .btn-copy:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-copy.copied { border-color: var(--accent); color: var(--accent); }
+    .btn-clear { background: transparent; border: 0.5px solid var(--border); color: var(--muted); }
+    .btn-clear:hover { border-color: var(--danger); color: var(--danger); }
+
+    /* ── Status Bar ── */
+    .status-bar {
+      background: var(--bg2); border: 0.5px solid var(--border);
+      border-radius: var(--rad); padding: 8px 12px;
+      font-size: 11px; color: var(--muted);
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 1.25rem;
+    }
+    .status-bar .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+    .status-bar.ok .dot { background: var(--accent); }
+    .status-bar.err .dot { background: var(--danger); }
+    .status-bar.ok { color: var(--accent); border-color: rgba(29,158,117,0.3); }
+    .status-bar.err { color: var(--danger); border-color: rgba(226,75,74,0.3); }
+
+    /* ── Info Panel ── */
+    .info-panel {
+      background: var(--bg2); border: 0.5px solid var(--border);
+      border-radius: var(--radlg); padding: 1rem; font-size: 12px;
+    }
+    .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin-bottom: 1rem; }
+    .ic-label { font-size: 10px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 3px; font-family: var(--font-ui); }
+    .ic-val { font-size: 13px; font-weight: 500; color: var(--text); }
+    .divider { border: none; border-top: 0.5px solid var(--border); margin: 0.75rem 0; }
+    .algo-desc { color: var(--muted); font-size: 11px; line-height: 1.7; }
+    .badge { display: inline-block; font-size: 10px; padding: 2px 9px; border-radius: 999px; font-family: var(--font-ui); }
+    .badge-sym  { background: rgba(29,158,117,0.15); color: #1D9E75; border: 0.5px solid rgba(29,158,117,0.3); }
+    .badge-enc  { background: rgba(239,159,39,0.15);  color: #EF9F27; border: 0.5px solid rgba(239,159,39,0.3); }
+    .badge-hash { background: rgba(55,138,221,0.15);  color: #378ADD; border: 0.5px solid rgba(55,138,221,0.3); }
+    .warn-note { margin-top: 8px; font-size: 11px; color: var(--warn); display: flex; align-items: center; gap: 6px; }
+    .warn-note.danger { color: var(--danger); }
+
+    /* ─────────────────────────────────────────
+       HISTORY PANEL (right column)
+    ───────────────────────────────────────── */
+    .history-panel {
+      background: var(--bg2);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radlg);
+      display: flex; flex-direction: column;
+      max-height: 700px;
+    }
+    .history-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px;
+      border-bottom: 0.5px solid var(--border);
+      flex-shrink: 0;
+    }
+    .history-title {
+      font-size: 11px; color: var(--muted);
+      letter-spacing: 0.1em; text-transform: uppercase;
+      font-family: var(--font-ui);
+    }
+    .history-actions { display: flex; gap: 6px; }
+    .hist-btn {
+      background: none; border: 0.5px solid var(--border);
+      border-radius: 6px; padding: 4px 8px;
+      font-size: 11px; color: var(--muted);
+      cursor: pointer; font-family: var(--font-mono);
+      transition: all 0.15s; display: flex; align-items: center; gap: 4px;
+    }
+    .hist-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .hist-btn.del:hover { border-color: var(--danger); color: var(--danger); }
+
+    .history-list {
+      flex: 1; overflow-y: auto; padding: 10px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .history-list::-webkit-scrollbar { width: 4px; }
+    .history-list::-webkit-scrollbar-track { background: transparent; }
+    .history-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+
+    .hist-item {
+      background: var(--bg3); border: 0.5px solid var(--border);
+      border-radius: var(--rad); padding: 10px 12px;
+      cursor: pointer; transition: border-color 0.15s;
+      position: relative;
+    }
+    .hist-item:hover { border-color: var(--accent); }
+    .hist-item-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+    .hist-algo { font-size: 11px; color: var(--accent); font-family: var(--font-mono); font-weight: 600; }
+    .hist-op { font-size: 10px; color: var(--muted); font-family: var(--font-ui); letter-spacing: 0.05em; }
+    .hist-time { font-size: 10px; color: var(--muted); }
+    .hist-preview {
+      font-size: 11px; color: var(--muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-family: var(--font-mono); line-height: 1.4;
+    }
+    .hist-del-btn {
+      position: absolute; top: 8px; right: 8px;
+      background: none; border: none; color: var(--muted);
+      cursor: pointer; font-size: 13px; padding: 2px 4px;
+      border-radius: 4px; opacity: 0; transition: all 0.15s;
+    }
+    .hist-item:hover .hist-del-btn { opacity: 1; }
+    .hist-del-btn:hover { color: var(--danger); }
+
+    .hist-empty {
+      text-align: center; padding: 2rem 1rem;
+      color: var(--muted); font-size: 12px; line-height: 1.8;
+    }
+    .hist-empty i { font-size: 28px; display: block; margin-bottom: 8px; opacity: 0.4; }
+
+    .hist-loading {
+      text-align: center; padding: 1.5rem;
+      color: var(--muted); font-size: 12px;
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 2rem; padding-top: 1rem;
+      border-top: 0.5px solid var(--border);
+      text-align: center; font-size: 11px;
+      color: var(--muted); letter-spacing: 0.06em;
+    }
+
+    /* Spinner */
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--bg2); border: 0.5px solid var(--border2);
+      border-radius: var(--rad); padding: 10px 16px;
+      font-size: 12px; color: var(--text);
+      display: flex; align-items: center; gap: 8px;
+      transform: translateY(80px); opacity: 0;
+      transition: all 0.25s; z-index: 999;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.ok { border-color: rgba(29,158,117,0.4); }
+    .toast.err { border-color: rgba(226,75,74,0.4); }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     AUTH SCREEN
+══════════════════════════════════════════ -->
+<div id="authScreen">
+  <div class="auth-card">
+    <!-- Logo -->
+    <div class="auth-logo">
+      <svg viewBox="0 0 120 148" xmlns="http://www.w3.org/2000/svg">
+        <path d="M60 0 L108 22 L108 72 Q108 120 60 148 Q12 120 12 72 L12 22 Z" fill="#1D9E75"/>
+        <path d="M60 10 L100 29 L100 72 Q100 112 60 136 Q20 112 20 72 L20 29 Z" fill="#0F6E56"/>
+        <line x1="60" y1="50" x2="60" y2="34" stroke="#1D9E75" stroke-width="2.5"/><circle cx="60" cy="32" r="4" fill="#1D9E75"/>
+        <line x1="44" y1="62" x2="28" y2="62" stroke="#1D9E75" stroke-width="2.5"/><circle cx="26" cy="62" r="4" fill="#1D9E75"/>
+        <line x1="76" y1="62" x2="92" y2="62" stroke="#1D9E75" stroke-width="2.5"/><circle cx="94" cy="62" r="4" fill="#1D9E75"/>
+        <rect x="40" y="60" width="40" height="32" rx="5" fill="#E6FAF4" opacity="0.96"/>
+        <path d="M48 60 L48 48 Q48 36 60 36 Q72 36 72 48 L72 60" fill="none" stroke="#E6FAF4" stroke-width="5" stroke-linecap="round" opacity="0.96"/>
+        <circle cx="60" cy="74" r="6" fill="#0F6E56"/><rect x="57.5" y="74" width="5" height="9" rx="1.5" fill="#0F6E56"/>
+      </svg>
+      <div>
+        <div class="title">CipherVault</div>
+        <div class="subtitle">Secure Encryption Platform</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchTab('login')" id="tabLogin">Login</button>
+      <button class="auth-tab" onclick="switchTab('register')" id="tabRegister">Register</button>
+    </div>
+
+    <!-- Login Form -->
+    <div id="loginForm">
+      <div class="auth-field">
+        <label>Email Address</label>
+        <input class="auth-input" type="email" id="loginEmail" placeholder="you@example.com" />
+      </div>
+      <div class="auth-field">
+        <label>Password</label>
+        <input class="auth-input" type="password" id="loginPassword" placeholder="Enter your password" />
+      </div>
+      <button class="auth-submit" id="loginBtn" onclick="doLogin()">
+        <i class="ti ti-lock"></i> Login
+      </button>
+    </div>
+
+    <!-- Register Form -->
+    <div id="registerForm" style="display:none">
+      <div class="auth-field">
+        <label>Email Address</label>
+        <input class="auth-input" type="email" id="regEmail" placeholder="you@example.com" />
+      </div>
+      <div class="auth-field">
+        <label>Password</label>
+        <input class="auth-input" type="password" id="regPassword" placeholder="Create a strong password" oninput="checkPwStrength(this.value)" onfocus="document.getElementById('pwRules').classList.add('show')" />
+        <!-- Strength Bar -->
+        <div class="pw-strength">
+          <div class="pw-bar-wrap"><div class="pw-bar" id="pwBar"></div></div>
+          <div class="pw-label" id="pwLabel">Enter a password</div>
+        </div>
+        <!-- Rules -->
+        <div class="pw-rules" id="pwRules">
+          <div class="pw-rule" id="r-len"><span class="dot"></span> At least 8 characters</div>
+          <div class="pw-rule" id="r-upper"><span class="dot"></span> One uppercase letter (A-Z)</div>
+          <div class="pw-rule" id="r-num"><span class="dot"></span> One number (0-9)</div>
+          <div class="pw-rule" id="r-sym"><span class="dot"></span> One special character (!@#$...)</div>
+        </div>
+      </div>
+      <div class="auth-field">
+        <label>Confirm Password</label>
+        <input class="auth-input" type="password" id="regConfirm" placeholder="Repeat your password" />
+      </div>
+      <button class="auth-submit" id="registerBtn" onclick="doRegister()">
+        <i class="ti ti-user-plus"></i> Create Account
+      </button>
+    </div>
+
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MAIN APP SCREEN
+══════════════════════════════════════════ -->
+<div id="appScreen">
+  <div class="app-wrap">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <svg class="logo-svg" viewBox="0 0 120 148" xmlns="http://www.w3.org/2000/svg">
+          <path d="M60 0 L108 22 L108 72 Q108 120 60 148 Q12 120 12 72 L12 22 Z" fill="#1D9E75"/>
+          <path d="M60 10 L100 29 L100 72 Q100 112 60 136 Q20 112 20 72 L20 29 Z" fill="#0F6E56"/>
+          <line x1="60" y1="50" x2="60" y2="34" stroke="#1D9E75" stroke-width="2.5"/><circle cx="60" cy="32" r="4" fill="#1D9E75"/>
+          <line x1="44" y1="62" x2="28" y2="62" stroke="#1D9E75" stroke-width="2.5"/><circle cx="26" cy="62" r="4" fill="#1D9E75"/>
+          <line x1="76" y1="62" x2="92" y2="62" stroke="#1D9E75" stroke-width="2.5"/><circle cx="94" cy="62" r="4" fill="#1D9E75"/>
+          <rect x="40" y="60" width="40" height="32" rx="5" fill="#E6FAF4" opacity="0.96"/>
+          <path d="M48 60 L48 48 Q48 36 60 36 Q72 36 72 48 L72 60" fill="none" stroke="#E6FAF4" stroke-width="5" stroke-linecap="round" opacity="0.96"/>
+          <circle cx="60" cy="74" r="6" fill="#0F6E56"/><rect x="57.5" y="74" width="5" height="9" rx="1.5" fill="#0F6E56"/>
+        </svg>
+        <div>
+          <div class="title">CipherVault</div>
+          <div class="subtitle">Multi-Algorithm Encryption</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="user-badge"><i class="ti ti-user-circle"></i><span id="userEmail">—</span></div>
+        <button class="logout-btn" onclick="doLogout()"><i class="ti ti-logout"></i> Logout</button>
+      </div>
+    </div>
+
+    <!-- Two-column layout -->
+    <div class="app-cols">
+
+      <!-- LEFT: Encryption Tool -->
+      <div>
+        <div class="section-label">Select Algorithm</div>
+        <div class="algo-grid" id="algoGrid"></div>
+
+        <div class="key-row">
+          <div class="key-wrap">
+            <div class="section-label">Encryption Key / Passphrase</div>
+            <input class="key-input" id="keyInput" type="text" placeholder="Enter key or passphrase..." />
+          </div>
+          <button class="gen-btn" onclick="genKey()"><i class="ti ti-refresh"></i> Generate</button>
+        </div>
+
+        <div class="io-grid">
+          <div class="io-box">
+            <div class="section-label">Input Text</div>
+            <textarea class="io-textarea" id="inputText" placeholder="Type or paste your text here..."></textarea>
+          </div>
+          <div class="io-box">
+            <div class="section-label">Output</div>
+            <textarea class="io-textarea output" id="outputText" placeholder="Result appears here..." readonly></textarea>
+          </div>
+        </div>
+
+        <div class="action-bar">
+          <button class="action-btn btn-encrypt" onclick="doEncrypt()"><i class="ti ti-lock"></i> Encrypt</button>
+          <button class="action-btn btn-decrypt" onclick="doDecrypt()"><i class="ti ti-lock-open"></i> Decrypt</button>
+          <button class="action-btn btn-copy" id="copyBtn" onclick="copyOutput()"><i class="ti ti-copy"></i> Copy</button>
+          <button class="action-btn btn-clear" onclick="clearAll()"><i class="ti ti-trash"></i> Clear</button>
+        </div>
+
+        <div class="status-bar" id="statusBar">
+          <span class="dot"></span>
+          <span id="statusMsg">Ready — select an algorithm and enter text</span>
+        </div>
+
+        <div class="info-panel" id="infoPanel"></div>
+      </div>
+
+      <!-- RIGHT: History Panel -->
+      <div>
+        <div class="history-panel">
+          <div class="history-header">
+            <div class="history-title"><i class="ti ti-history"></i> Encryption History</div>
+            <div class="history-actions">
+              <button class="hist-btn" onclick="loadHistory()" title="Reload history">
+                <i class="ti ti-refresh"></i> Reload
+              </button>
+              <button class="hist-btn del" onclick="clearAllHistory()" title="Clear all history">
+                <i class="ti ti-trash"></i> Clear All
+              </button>
+            </div>
+          </div>
+          <div class="history-list" id="historyList">
+            <div class="hist-loading"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end app-cols -->
+
+    <div class="footer">CipherVault &nbsp;|&nbsp; Powered by Firebase &amp; CryptoJS &nbsp;|&nbsp; For educational use</div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCLmUfVyHzbMZv6K4qr-Q-oMU-QebJor24",
+  authDomain: "ciphervault-9d0b6.firebaseapp.com",
+  projectId: "ciphervault-9d0b6",
+  storageBucket: "ciphervault-9d0b6.firebasestorage.app",
+  messagingSenderId: "131197787432",
+  appId: "1:131197787432:web:fea371821f8f434537441d",
+  measurementId: "G-E0C92S7K19"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+// ── Auth State Observer ───────────────────
+auth.onAuthStateChanged(user => {
+  if (user) {
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('appScreen').style.display  = 'block';
+    document.getElementById('userEmail').textContent = user.email;
+    renderAlgos();
+    renderInfo();
+    loadHistory();
+  } else {
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('appScreen').style.display  = 'none';
+  }
+});
+
+// ══════════════════════════════════════════
+//  AUTH FUNCTIONS
+// ══════════════════════════════════════════
+function switchTab(tab) {
+  document.getElementById('loginForm').style.display    = tab === 'login'    ? 'block' : 'none';
+  document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
+  document.getElementById('tabLogin').classList.toggle('active',    tab === 'login');
+  document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
+  hideAuthError();
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('authError');
+  el.textContent = msg; el.classList.add('show');
+}
+function hideAuthError() {
+  document.getElementById('authError').classList.remove('show');
+}
+
+function setAuthLoading(btnId, loading) {
+  const btn = document.getElementById(btnId);
+  btn.disabled = loading;
+  btn.innerHTML = loading
+    ? '<span class="spinner"></span> Please wait...'
+    : (btnId === 'loginBtn'
+        ? '<i class="ti ti-lock"></i> Login'
+        : '<i class="ti ti-user-plus"></i> Create Account');
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPassword').value;
+  if (!email || !pass) { showAuthError('Please fill in all fields.'); return; }
+  hideAuthError();
+  setAuthLoading('loginBtn', true);
+  try {
+    await auth.signInWithEmailAndPassword(email, pass);
+  } catch(e) {
+    showAuthError(friendlyAuthError(e.code));
+    setAuthLoading('loginBtn', false);
+  }
+}
+
+async function doRegister() {
+  const email   = document.getElementById('regEmail').value.trim();
+  const pass    = document.getElementById('regPassword').value;
+  const confirm = document.getElementById('regConfirm').value;
+  if (!email || !pass || !confirm) { showAuthError('Please fill in all fields.'); return; }
+  if (pass !== confirm) { showAuthError('Passwords do not match.'); return; }
+  if (!validatePassword(pass)) { showAuthError('Password does not meet all requirements.'); return; }
+  hideAuthError();
+  setAuthLoading('registerBtn', true);
+  try {
+    await auth.createUserWithEmailAndPassword(email, pass);
+    showToast('ok', 'Account created successfully!');
+  } catch(e) {
+    showAuthError(friendlyAuthError(e.code));
+    setAuthLoading('registerBtn', false);
+  }
+}
+
+async function doLogout() {
+  await auth.signOut();
+  showToast('ok', 'Logged out successfully');
+}
+
+function friendlyAuthError(code) {
+  const map = {
+    'auth/user-not-found':       'No account found with this email.',
+    'auth/wrong-password':       'Incorrect password. Please try again.',
+    'auth/email-already-in-use': 'This email is already registered.',
+    'auth/invalid-email':        'Please enter a valid email address.',
+    'auth/weak-password':        'Password must be at least 6 characters.',
+    'auth/too-many-requests':    'Too many attempts. Please try again later.',
+    'auth/network-request-failed': 'Network error. Check your connection.',
+  };
+  return map[code] || 'An error occurred. Please try again.';
+}
+
+// ── Password Strength Checker ─────────────
+function validatePassword(p) {
+  return p.length >= 8 && /[A-Z]/.test(p) && /[0-9]/.test(p) && /[^A-Za-z0-9]/.test(p);
+}
+function checkPwStrength(p) {
+  const checks = {
+    'r-len':   p.length >= 8,
+    'r-upper': /[A-Z]/.test(p),
+    'r-num':   /[0-9]/.test(p),
+    'r-sym':   /[^A-Za-z0-9]/.test(p),
+  };
+  let score = Object.values(checks).filter(Boolean).length;
+  Object.entries(checks).forEach(([id, pass]) => {
+    document.getElementById(id).classList.toggle('pass', pass);
+  });
+  const bar   = document.getElementById('pwBar');
+  const label = document.getElementById('pwLabel');
+  const configs = [
+    { w:'0%',   bg:'transparent', txt:'Enter a password' },
+    { w:'25%',  bg:'#E24B4A',     txt:'Weak' },
+    { w:'50%',  bg:'#EF9F27',     txt:'Fair' },
+    { w:'75%',  bg:'#378ADD',     txt:'Good' },
+    { w:'100%', bg:'#1D9E75',     txt:'Strong ✓' },
+  ];
+  const c = configs[score];
+  bar.style.width = c.w; bar.style.background = c.bg;
+  label.textContent = c.txt; label.style.color = c.bg || 'var(--muted)';
+}
+
+// ══════════════════════════════════════════
+//  ALGORITHMS
+// ══════════════════════════════════════════
+const ALGOS = [
+  { id:'aes',    name:'AES',     type:'Symmetric', keyNeeded:true,  desc:'Advanced Encryption Standard. Industry-standard 256-bit block cipher. Used in TLS, WPA2, file encryption.', strength:'Very Strong', strengthColor:'#1D9E75', keyHint:'Any passphrase (auto-stretched to 256-bit)' },
+  { id:'des',    name:'DES',     type:'Symmetric', keyNeeded:true,  desc:'Data Encryption Standard. Legacy 64-bit cipher. Considered broken — for learning only.', strength:'Weak (legacy)', strengthColor:'#E24B4A', keyHint:'Any passphrase', warn:'DES is considered broken. Do not use for real security.' },
+  { id:'3des',   name:'3DES',    type:'Symmetric', keyNeeded:true,  desc:'Triple DES — applies DES three times. Stronger than DES, still used in some banking systems.', strength:'Moderate', strengthColor:'#EF9F27', keyHint:'Any passphrase' },
+  { id:'rc4',    name:'RC4',     type:'Symmetric', keyNeeded:true,  desc:'Stream cipher once used in SSL/WEP. Now deprecated due to known vulnerabilities.', strength:'Weak (deprecated)', strengthColor:'#E24B4A', keyHint:'Any passphrase', warn:'RC4 is deprecated. Not for production use.' },
+  { id:'rabbit', name:'Rabbit',  type:'Symmetric', keyNeeded:true,  desc:'High-speed eSTREAM stream cipher. Good balance of speed and security for software use.', strength:'Strong', strengthColor:'#1D9E75', keyHint:'Any passphrase' },
+  { id:'b64',    name:'Base64',  type:'Encoding',  keyNeeded:false, desc:'Reversible encoding scheme, not encryption. Used in emails and data URLs. Anyone can decode it.', strength:'No security', strengthColor:'#EF9F27', warn:'Base64 is encoding only — not encryption.' },
+  { id:'md5',    name:'MD5',     type:'Hash',      keyNeeded:false, desc:'One-way 128-bit hash. Cannot be decrypted. Broken for security; use for checksums only.', strength:'Broken', strengthColor:'#E24B4A', warnDanger:'MD5 is cryptographically broken. Never use for passwords.' },
+  { id:'sha1',   name:'SHA-1',   type:'Hash',      keyNeeded:false, desc:'160-bit one-way hash. Deprecated — use SHA-256 or SHA-3 for all new systems.', strength:'Weak (deprecated)', strengthColor:'#E24B4A', warn:'SHA-1 is deprecated for security use.' },
+  { id:'sha256', name:'SHA-256', type:'Hash',      keyNeeded:false, desc:'256-bit hash from SHA-2 family. Used in Bitcoin, TLS, digital signatures. Considered secure today.', strength:'Strong', strengthColor:'#1D9E75' },
+];
+
+let current = ALGOS[0];
+
+function renderAlgos() {
+  document.getElementById('algoGrid').innerHTML = ALGOS.map(a => `
+    <button class="algo-btn ${a.id === current.id ? 'active' : ''}" onclick="selectAlgo('${a.id}')">
+      <div class="algo-name">${a.name}</div>
+      <div class="algo-type">${a.type}</div>
+    </button>`).join('');
+}
+
+function renderInfo() {
+  const a = current;
+  const bc = a.type === 'Symmetric' ? 'badge-sym' : a.type === 'Encoding' ? 'badge-enc' : 'badge-hash';
+  document.getElementById('infoPanel').innerHTML = `
+    <div class="info-grid">
+      <div><div class="ic-label">Algorithm</div><div class="ic-val" style="font-family:var(--font-mono)">${a.name}</div></div>
+      <div><div class="ic-label">Type</div><div class="ic-val"><span class="badge ${bc}">${a.type}</span></div></div>
+      <div><div class="ic-label">Strength</div><div class="ic-val" style="color:${a.strengthColor}">${a.strength}</div></div>
+      <div><div class="ic-label">Key Required</div><div class="ic-val">${a.keyNeeded ? 'Yes' : 'No'}</div></div>
+    </div>
+    <div class="divider"></div>
+    <div class="algo-desc">${a.desc}</div>
+    ${a.type==='Hash'    ? '<div class="warn-note"><i class="ti ti-info-circle"></i> Hash functions are one-way. Decryption is impossible.</div>' : ''}
+    ${a.type==='Encoding'? '<div class="warn-note"><i class="ti ti-alert-triangle"></i> Base64 is encoding only — anyone can decode it.</div>' : ''}
+    ${a.warn            ? `<div class="warn-note"><i class="ti ti-alert-triangle"></i> ${a.warn}</div>` : ''}
+    ${a.warnDanger      ? `<div class="warn-note danger"><i class="ti ti-alert-triangle"></i> ${a.warnDanger}</div>` : ''}`;
+}
+
+function selectAlgo(id) {
+  current = ALGOS.find(a => a.id === id);
+  renderAlgos(); renderInfo();
+  const ki = document.getElementById('keyInput');
+  ki.disabled = !current.keyNeeded;
+  ki.placeholder = current.keyNeeded ? (current.keyHint || 'Enter passphrase...') : 'No key needed for ' + current.name;
+  setStatus('neutral', 'Algorithm: ' + current.name);
+}
+
+function genKey() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+  let k = '';
+  for (let i = 0; i < 24; i++) k += chars[Math.floor(Math.random() * chars.length)];
+  document.getElementById('keyInput').value = k;
+  setStatus('ok', 'Random key generated — save it somewhere safe!');
+}
+
+function setStatus(type, msg) {
+  const bar = document.getElementById('statusBar');
+  bar.className = 'status-bar ' + (type === 'ok' ? 'ok' : type === 'err' ? 'err' : '');
+  document.getElementById('statusMsg').textContent = msg;
+}
+
+// ══════════════════════════════════════════
+//  ENCRYPT / DECRYPT
+// ══════════════════════════════════════════
+async function doEncrypt() {
+  const txt = document.getElementById('inputText').value.trim();
+  const key = document.getElementById('keyInput').value;
+  if (!txt) { setStatus('err', 'Please enter some text to encrypt.'); return; }
+  if (current.keyNeeded && !key) { setStatus('err', 'Please enter a key or passphrase.'); return; }
+  let result = '';
+  try {
+    if      (current.id === 'aes')    result = CryptoJS.AES.encrypt(txt, key).toString();
+    else if (current.id === 'des')    result = CryptoJS.DES.encrypt(txt, key).toString();
+    else if (current.id === '3des')   result = CryptoJS.TripleDES.encrypt(txt, key).toString();
+    else if (current.id === 'rc4')    result = CryptoJS.RC4.encrypt(txt, key).toString();
+    else if (current.id === 'rabbit') result = CryptoJS.Rabbit.encrypt(txt, key).toString();
+    else if (current.id === 'b64')    result = btoa(unescape(encodeURIComponent(txt)));
+    else if (current.id === 'md5')    result = CryptoJS.MD5(txt).toString();
+    else if (current.id === 'sha1')   result = CryptoJS.SHA1(txt).toString();
+    else if (current.id === 'sha256') result = CryptoJS.SHA256(txt).toString();
+    document.getElementById('outputText').value = result;
+    const isHash = current.type === 'Hash';
+    setStatus('ok', isHash ? current.name + ' hash generated' : 'Encrypted with ' + current.name);
+    await saveHistory('encrypt', txt, result);
+  } catch(e) { setStatus('err', 'Encryption failed: ' + e.message); }
+}
+
+async function doDecrypt() {
+  if (current.type === 'Hash') { setStatus('err', current.name + ' is one-way — decryption impossible.'); return; }
+  const txt = document.getElementById('inputText').value.trim();
+  const key = document.getElementById('keyInput').value;
+  if (!txt) { setStatus('err', 'Please enter ciphertext to decrypt.'); return; }
+  if (current.keyNeeded && !key) { setStatus('err', 'Please enter the same key used for encryption.'); return; }
+  let result = '';
+  try {
+    if      (current.id === 'aes')    result = CryptoJS.AES.decrypt(txt, key).toString(CryptoJS.enc.Utf8);
+    else if (current.id === 'des')    result = CryptoJS.DES.decrypt(txt, key).toString(CryptoJS.enc.Utf8);
+    else if (current.id === '3des')   result = CryptoJS.TripleDES.decrypt(txt, key).toString(CryptoJS.enc.Utf8);
+    else if (current.id === 'rc4')    result = CryptoJS.RC4.decrypt(txt, key).toString(CryptoJS.enc.Utf8);
+    else if (current.id === 'rabbit') result = CryptoJS.Rabbit.decrypt(txt, key).toString(CryptoJS.enc.Utf8);
+    else if (current.id === 'b64')    result = decodeURIComponent(escape(atob(txt)));
+    if (!result) throw new Error('Wrong key or corrupted ciphertext');
+    document.getElementById('outputText').value = result;
+    setStatus('ok', 'Decrypted successfully with ' + current.name);
+    await saveHistory('decrypt', txt, result);
+  } catch(e) { setStatus('err', 'Decryption failed — check your key and ciphertext.'); }
+}
+
+function copyOutput() {
+  const out = document.getElementById('outputText').value;
+  if (!out) { setStatus('err', 'Nothing to copy yet.'); return; }
+  navigator.clipboard.writeText(out).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.classList.add('copied');
+    btn.innerHTML = '<i class="ti ti-check"></i> Copied!';
+    setStatus('ok', 'Output copied to clipboard');
+    setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = '<i class="ti ti-copy"></i> Copy'; }, 2000);
+  });
+}
+
+function clearAll() {
+  document.getElementById('inputText').value = '';
+  document.getElementById('outputText').value = '';
+  document.getElementById('keyInput').value = '';
+  setStatus('neutral', 'Cleared — ready for new input');
+}
+
+// ══════════════════════════════════════════
+//  HISTORY (Firestore)
+// ══════════════════════════════════════════
+async function saveHistory(operation, input, output) {
+  const user = auth.currentUser;
+  if (!user) return;
+  try {
+    await db.collection('users').doc(user.uid).collection('history').add({
+      algorithm:  current.name,
+      type:       current.type,
+      operation:  operation,
+      inputPreview:  input.substring(0, 60),
+      outputPreview: output.substring(0, 60),
+      timestamp:  firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    loadHistory(); // auto-refresh
+  } catch(e) { console.error('Failed to save history:', e); }
+}
+
+async function loadHistory() {
+  const user = auth.currentUser;
+  if (!user) return;
+  const list = document.getElementById('historyList');
+  list.innerHTML = '<div class="hist-loading"><div class="spinner"></div></div>';
+  try {
+    const snap = await db.collection('users').doc(user.uid)
+      .collection('history')
+      .orderBy('timestamp', 'desc')
+      .limit(50)
+      .get();
+    if (snap.empty) {
+      list.innerHTML = `<div class="hist-empty"><i class="ti ti-clock-off"></i>No history yet.<br>Encrypt something to get started.</div>`;
+      return;
+    }
+    list.innerHTML = '';
+    snap.forEach(doc => {
+      const d = doc.data();
+      const ts = d.timestamp ? new Date(d.timestamp.seconds * 1000) : new Date();
+      const timeStr = ts.toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+      const div = document.createElement('div');
+      div.className = 'hist-item';
+      div.innerHTML = `
+        <div class="hist-item-top">
+          <span class="hist-algo">${d.algorithm}</span>
+          <span class="hist-op">${d.operation.toUpperCase()}</span>
+        </div>
+        <div class="hist-preview" title="${d.inputPreview}">${d.inputPreview || '—'}</div>
+        <div class="hist-time" style="margin-top:5px">${timeStr}</div>
+        <button class="hist-del-btn" onclick="deleteHistoryItem('${doc.id}', event)" title="Delete this entry"><i class="ti ti-x"></i></button>`;
+      // Click to restore
+      div.addEventListener('click', () => {
+        document.getElementById('outputText').value = d.outputPreview;
+        setStatus('ok', 'Restored from history: ' + d.algorithm + ' ' + d.operation);
+      });
+      list.appendChild(div);
+    });
+    showToast('ok', 'History loaded (' + snap.size + ' entries)');
+  } catch(e) {
+    list.innerHTML = `<div class="hist-empty"><i class="ti ti-alert-triangle"></i>Failed to load history.</div>`;
+    console.error(e);
+  }
+}
+
+async function deleteHistoryItem(docId, event) {
+  event.stopPropagation();
+  const user = auth.currentUser;
+  if (!user) return;
+  try {
+    await db.collection('users').doc(user.uid).collection('history').doc(docId).delete();
+    showToast('ok', 'Entry deleted');
+    loadHistory();
+  } catch(e) { showToast('err', 'Failed to delete entry'); }
+}
+
+async function clearAllHistory() {
+  const user = auth.currentUser;
+  if (!user) return;
+  if (!confirm('Delete ALL encryption history? This cannot be undone.')) return;
+  const list = document.getElementById('historyList');
+  list.innerHTML = '<div class="hist-loading"><div class="spinner"></div></div>';
+  try {
+    const snap = await db.collection('users').doc(user.uid).collection('history').get();
+    const batch = db.batch();
+    snap.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+    showToast('ok', 'All history cleared');
+    loadHistory();
+  } catch(e) { showToast('err', 'Failed to clear history'); }
+}
+
+// ── Toast ─────────────────────────────────
+function showToast(type, msg) {
+  const t = document.getElementById('toast');
+  t.className = 'toast ' + type + ' show';
+  t.innerHTML = `<i class="ti ti-${type==='ok'?'check':'alert-circle'}"></i> ${msg}`;
+  setTimeout(() => { t.classList.remove('show'); }, 3000);
+}
+</script>
+</body>
+</html>
